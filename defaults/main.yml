@@ -53,4 +53,16 @@ docker_apt_filename: docker
 # A list of users who will be added to the docker group.
 docker_users: ['{{ interactive_user }}', '{{ ansible_env.SUDO_USER | default(ansible_env.USER, true) | default(ansible_user_id, true) }}']
 # Docker daemon options as a dict
-docker_daemon_options: {}
+# Andre December 2025: Added min-api-version to avoid issues with Portainer and newer Docker versions
+docker_daemon_options: {
+  "log-driver": "journald",
+  "min-api-version": "1.41"
+}
+# docker_daemon_options: {
+#   "log-driver": "json-file",
+#   "log-opts": {
+#   "max-size": "10m",
+#   "max-file": "3"
+#   }
+#   "min-api-version": "1.41"
+# }

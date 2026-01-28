@@ -35,9 +35,9 @@ docker_repo_url: https://download.docker.com/linux
 
 # Used only for Debian/Ubuntu/Pop!_OS/Linux Mint. Switch 'stable' to 'nightly' if needed.
 docker_apt_release_channel: stable
-# docker_apt_ansible_distribution is a workaround for Ubuntu variants which can't be identified as such by Ansible,
+# docker_apt_ansible_facts['distribution'] is a workaround for Ubuntu variants which can't be identified as such by Ansible,
 # and is only necessary until Docker officially supports them.
-docker_apt_ansible_distribution: "{{ ansible_distribution }}"
+docker_apt_ansible_distribution: "{{ ansible_facts['distribution'] }}"
 docker_apt_arch: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}"
 docker_apt_repository: "{{ docker_repo_url }}/{{ docker_apt_ansible_distribution | lower }}"
 docker_apt_ignore_key_error: true
@@ -46,7 +46,10 @@ docker_apt_gpg_key_checksum: sha256:1500c1f56fa9e26b9b8f42452a553675796ade0807cd
 docker_apt_filename: docker
 
 # A list of users who will be added to the docker group.
-docker_users: ['{{ interactive_user }}', '{{ ansible_env.SUDO_USER | default(ansible_env.USER, true) | default(ansible_user_id, true) }}']
+docker_users: [
+  '{{ interactive_user }}',
+  '{{ ansible_facts["env"].SUDO_USER | default(ansible_facts["env"].USER, true) | default(ansible_facts["user_id"], true) }}'
+]
 # Docker daemon options as a dict
 # Andre December 2025: Added min-api-version to avoid issues with Portainer and newer Docker versions
 docker_daemon_options: {

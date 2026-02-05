@@ -28,12 +28,39 @@
     mode: "0755"
   when: docker_daemon_options.keys() | length > 0
 
+- name: Were we here before?
+  ansible.builtin.stat:
+    path: /etc/systemd/system/docker.service.d
+  register: stat_dsd
+
+- name: Set appropriate flag
+  ansible.builtin.set_fact:
+    been_here_before: "{{ stat_dsd.stat.exists and stat_dsd.stat.isdir }}"
+
+- name: Create directory for override file
+  ansible.builtin.file:
+    path: /etc/systemd/system/docker.service.d
+    state: directory
+    mode: '0644'
+  when:
+    - not been_here_before
+    - ('outpost' in group_names)
+
+- name: Template out the override file
+  ansible.builtin.template:
+    src: override.orig.conf.j2
+    dest: /etc/systemd/system/docker.service.d/override.conf
+    mode: '0644'
+  when:
+    - not been_here_before
+    - ('outpost' in group_names)
+
 - name: Configure Docker daemon options.
   ansible.builtin.copy:
     content: "{{ docker_daemon_options | to_nice_json }}"
     dest: /etc/docker/daemon.json
     mode: "0644"
-  when: docker_daemon_options.keys() | length > 0
+  when: docker_daemon_options.keys() | length > 0 and not been_here_before
   notify: Restart docker
 
 - name: Ensure Docker is started and enabled at boot.
@@ -69,3 +96,7 @@
 - name: Include tasks to handle additional users
   ansible.builtin.include_tasks: docker-users.yml
   when: at_least_one_user_to_modify is defined
+
+- name: Include tasks to set-up remote connections to the Docker socket, if this is an outpost
+  ansible.builtin.include_tasks: docker-socket.yml
+  when: ('outpost' in group_names) and (not been_here_before or renew_certs)

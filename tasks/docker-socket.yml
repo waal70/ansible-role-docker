@@ -1,0 +1,175 @@
+---
+- name: Include vaulted password file
+  ansible.builtin.include_vars:
+    file: "{{ item }}"
+  with_first_found:
+    - files:
+        - "{{ private_repo }}/{{ ansible_vault }}/{{ ansible_role_name }}-vars.yml"
+      skip: true
+
+- name: "Ensure the folder to keep certificates exists"
+  ansible.builtin.file:
+    path: "{{ docker_certs_path }}"
+    state: directory
+    group: docker
+    mode: '0664'
+
+# Following the guide https://docs.docker.com/engine/security/protect-access/
+
+# Step: Create a CA, server and client keys with OpenSSL
+# Command: openssl genrsa -aes256 -out ca-key.pem 4096
+
+- name: Generate an OpenSSL private key
+  community.crypto.openssl_privatekey:
+    path: "{{ docker_certs_path }}/ca-key.pem"
+    regenerate: "full_idempotence"
+    type: "RSA"
+    size: 4096
+    group: docker
+    mode: '0400'
+  register: create_pk
+
+- name: Generate a Self Signed certificate for the Docker CA, using command
+  ansible.builtin.command:
+    argv:
+      - openssl
+      - req
+      - -new
+      - -x509
+      - -nodes
+      - -subj
+      - "/C=NL/ST=Denial/L=Amstelveen/O=Dis/CN=Docker CA"
+      - -days
+      - 365
+      - -key
+      - "{{ docker_certs_path }}/ca-key.pem"
+      - -sha256
+      - -out
+      - "{{ docker_certs_path }}/ca.pem"
+  changed_when: true
+  when: create_pk.changed # noqa: no-handler
+
+- name: Generate a private key for the server certificate
+  community.crypto.openssl_privatekey:
+    path: "{{ docker_certs_path }}/server-key.pem"
+    regenerate: "full_idempotence"
+    type: "RSA"
+    size: 4096
+    group: docker
+    mode: '0400'
+
+- name: Collect information on this host in order to specify the SAN
+  ansible.builtin.set_fact:
+    san_list: ["DNS:{{ inventory_hostname }}", "DNS:{{ inventory_hostname }}.{{ fqdn }}", "IP:{{ ansible_host }}", "IP:127.0.0.1"]
+
+- name: Generate an OpenSSL Certificate Signing Request with special key usages
+  community.crypto.openssl_csr:
+    path: "{{ docker_certs_path }}/server.csr"
+    privatekey_path: "{{ docker_certs_path }}/server-key.pem"
+    common_name: "{{ inventory_hostname }}.{{ fqdn }}"
+    subject_alt_name: "{{ san_list }}"
+    key_usage:
+      - digitalSignature
+      - keyAgreement
+    extended_key_usage:
+      - serverAuth
+
+- name: Generate the server certificate based on the CSR
+  community.crypto.x509_certificate:
+    path: "{{ docker_certs_path }}/server-cert.pem"
+    csr_path: "{{ docker_certs_path }}/server.csr"
+    ownca_path: "{{ docker_certs_path }}/ca.pem"
+    ownca_privatekey_path: "{{ docker_certs_path }}/ca-key.pem"
+    ownca_not_after: "+365d"
+    ownca_digest: "sha256"
+    provider: ownca
+    mode: '0444'
+
+- name: Clean-up the server CSR
+  ansible.builtin.file:
+    path: "{{ docker_certs_path }}/server.csr"
+    state: absent
+# ===== END SERVER, BEGIN CLIENT
+
+- name: Generate a private key for the client certificate
+  community.crypto.openssl_privatekey:
+    path: "{{ docker_certs_path }}/client-key.pem"
+    regenerate: "full_idempotence"
+    type: "RSA"
+    size: 4096
+    group: docker
+    mode: '0400'
+
+- name: Generate an OpenSSL Certificate Signing Request with special key usages
+  community.crypto.openssl_csr:
+    path: "{{ docker_certs_path }}/client.csr"
+    privatekey_path: "{{ docker_certs_path }}/client-key.pem"
+    common_name: "client.{{ fqdn }}"
+    key_usage:
+      - digitalSignature
+      - keyAgreement
+    extended_key_usage:
+      - clientAuth
+
+- name: Generate the client certificate based on the CSR
+  community.crypto.x509_certificate:
+    path: "{{ docker_certs_path }}/client-cert.pem"
+    csr_path: "{{ docker_certs_path }}/client.csr"
+    ownca_path: "{{ docker_certs_path }}/ca.pem"
+    ownca_privatekey_path: "{{ docker_certs_path }}/ca-key.pem"
+    ownca_not_after: "+365d"
+    ownca_digest: "sha256"
+    provider: ownca
+    mode: '0444'
+
+- name: Clean-up the client CSR
+  ansible.builtin.file:
+    path: "{{ docker_certs_path }}/client.csr"
+    state: absent
+
+- name: Fetch the client certificate and keys to the local machine
+  ansible.builtin.fetch:
+    src: "{{ item }}"
+    dest: "{{ private_repo }}/ssh-keys/docker/{{ item | basename }}"
+    fail_on_missing: false
+    flat: true
+  with_items:
+    - "{{ docker_certs_path }}/client-cert.pem"
+    - "{{ docker_certs_path }}/client-key.pem"
+    - "{{ docker_certs_path }}/ca-key.pem"
+    - "{{ docker_certs_path }}/ca.pem"
+
+
+- name: Expand the docker_daemon_options with the TLS settings
+  ansible.builtin.set_fact:
+    docker_daemon_options: "{{ docker_daemon_options | combine({item._name: item._value}) }}"
+  with_items:
+    - { _name: "hosts", _value: ['tcp://{{ ansible_host }}:{{ docker_socket_port }}', 'fd://'] }
+    - { _name: "tls", _value: true}
+    - { _name: "tlsverify", _value: true}
+    - { _name: "tlscacert", _value: "{{ docker_certs_path }}/ca.pem"}
+    - { _name: "tlscert", _value: "{{ docker_certs_path }}/server-cert.pem"}
+    - { _name: "tlskey", _value: "{{ docker_certs_path }}/server-key.pem"}
+    - { _name: "containerd", _value: "/run/containerd/containerd.sock"}
+
+# We are now overriding the command-line, so there should be an override.conf
+
+- name: Create directory for override file
+  ansible.builtin.file:
+    path: /etc/systemd/system/docker.service.d
+    state: directory
+    mode: '0644'
+
+- name: Template out the override file
+  ansible.builtin.template:
+    src: override.conf.j2
+    dest: /etc/systemd/system/docker.service.d/override.conf
+    mode: '0644'
+
+- name: (Re-)configure Docker daemon through daemon.json.
+  ansible.builtin.copy:
+    content: "{{ docker_daemon_options | to_nice_json }}"
+    dest: /etc/docker/daemon.json
+    mode: "0644"
+  when: docker_daemon_options.keys() | length > 0
+  notify: Restart docker

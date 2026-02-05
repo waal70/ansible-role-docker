@@ -1,7 +1,8 @@
 ---
 - name: Restart docker
-  ansible.builtin.service:
+  ansible.builtin.systemd_service:
     name: docker
     state: "{{ docker_restart_handler_state }}"
+    daemon_reload: true
   ignore_errors: "{{ ansible_check_mode }}"
   when: docker_service_manage | bool

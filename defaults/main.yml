@@ -8,6 +8,11 @@ docker_packages:
   - containerd.io
 docker_packages_state: present
 
+docker_certs_path: "/appdata/docker/certs"
+fqdn: "yourdomain"
+docker_socket_port: 2376
+renew_certs: true
+
 # Service options.
 docker_service_manage: true
 docker_service_state: started
@@ -22,7 +27,7 @@ docker_compose_package_state: present
 # Docker Compose options
 # Andre January 2024: bump version to 2.28.1 from 2.24.1 from 2.11.1
 docker_install_compose: false
-docker_compose_version: v2.39.3
+docker_compose_version: v5.0.2
 docker_compose_arch: "{{ ansible_architecture }}"
 docker_compose_url: https://github.com/docker/compose/releases/download/{{ docker_compose_version }}/docker-compose-linux-{{ docker_compose_arch }}
 docker_compose_path: /usr/local/bin/docker-compose

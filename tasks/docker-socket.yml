@@ -46,7 +46,7 @@
       - -sha256
       - -out
       - "{{ docker_certs_path }}/ca.pem"
-  changed_when: true
+  changed_when: create_pk.changed
   when: create_pk.changed # noqa: no-handler
 
 - name: Generate a private key for the server certificate

@@ -97,10 +97,6 @@
   ansible.builtin.include_tasks: docker-users.yml
   when: at_least_one_user_to_modify is defined
 
-- name: Debug all the conditions
-  ansible.builtin.debug:
-    msg: "Here before: {{ been_here_before }}, renew: {{ renew_certs }}"
-
 - name: Include tasks to set-up remote connections to the Docker socket, if this is an outpost
   ansible.builtin.include_tasks: docker-socket.yml
   when:

@@ -11,7 +11,7 @@ docker_packages_state: present
 docker_certs_path: "/appdata/docker/certs"
 fqdn: "yourdomain"
 docker_socket_port: 2376
-renew_certs: true
+renew_certs: false
 
 # Service options.
 docker_service_manage: true

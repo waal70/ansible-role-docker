@@ -44,7 +44,7 @@
     mode: '0644'
   when:
     - not been_here_before
-    - ('outpost' in group_names)
+    - ('portainer_agent' in group_names)
 
 - name: Template out the override file
   ansible.builtin.template:
@@ -53,7 +53,7 @@
     mode: '0644'
   when:
     - not been_here_before
-    - ('outpost' in group_names)
+    - ('portainer_agent' in group_names)
 
 - name: Configure Docker daemon options.
   ansible.builtin.copy:
@@ -97,6 +97,12 @@
   ansible.builtin.include_tasks: docker-users.yml
   when: at_least_one_user_to_modify is defined
 
+- name: Debug all the conditions
+  ansible.builtin.debug:
+    msg: "Here before: {{ been_here_before }}, renew: {{ renew_certs }}"
+
 - name: Include tasks to set-up remote connections to the Docker socket, if this is an outpost
   ansible.builtin.include_tasks: docker-socket.yml
-  when: ('outpost' in group_names) and (not been_here_before or renew_certs)
+  when:
+    - "'portainer_agent' in group_names"
+    - not been_here_before or renew_certs

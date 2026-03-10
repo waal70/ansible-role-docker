@@ -97,7 +97,7 @@
   ansible.builtin.include_tasks: docker-users.yml
   when: at_least_one_user_to_modify is defined
 
-- name: Include tasks to set-up remote connections to the Docker socket, if this is an outpost
+- name: Include tasks to set-up remote connections to the Docker socket, if this is a Portainer Agent host
   ansible.builtin.include_tasks: docker-socket.yml
   when:
     - "'portainer_agent' in group_names"

@@ -14,6 +14,13 @@
     group: docker
     mode: '0664'
 
+# Bugfix 2026-03: ensure the correct python module is present
+- name: "In order to use the community.crypto, we need to ensure python3-cryptography is present"
+  ansible.builtin.apt:
+    name:
+      - python3-cryptography
+    state: present
+
 # Following the guide https://docs.docker.com/engine/security/protect-access/
 
 # Step: Create a CA, server and client keys with OpenSSL

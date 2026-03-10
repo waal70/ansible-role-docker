@@ -15,6 +15,23 @@
     state: present
   when: docker_add_repo | bool
 
+- name: Remove (old-style) Docker repo's when/if present
+  ansible.builtin.apt_repository:
+    repo: "deb {{ docker_apt_repository }} {{ ansible_facts['distribution_release'] }} {{ docker_apt_release_channel }}"
+    state: absent
+    update_cache: true
+
+- name: Remove (old-style) Docker repo's including incorrect signing key when/if present
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] {{ docker_apt_repository }} {{ ansible_facts['distribution_release'] }} {{ docker_apt_release_channel }}" # noqa: yaml[line-length]
+    state: absent
+    update_cache: true
+
+- name: Remove (old-style) Docker signing keys when/if present
+  ansible.builtin.file:
+    path: /etc/apt/keyrings/docker.gpg
+    state: absent
+
 - name: Add Docker repo using key from URL.
   ansible.builtin.deb822_repository:
     name: docker

@@ -134,10 +134,20 @@
     path: "{{ docker_certs_path }}/client.csr"
     state: absent
 
+# Andre fix 2026-03. As we may have multiple, make the distinction locally as well
+- name: Ensure the target folders exist locally
+  ansible.builtin.file:
+    path: "{{ private_repo }}/ssh-keys/docker/{{ inventory_hostname }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ interactive_user }}"
+    group: "{{ interactive_user }}"
+    recurse: true
+
 - name: Fetch the client certificate and keys to the local machine
   ansible.builtin.fetch:
     src: "{{ item }}"
-    dest: "{{ private_repo }}/ssh-keys/docker/{{ item | basename }}"
+    dest: "{{ private_repo }}/ssh-keys/docker/{{ inventory_hostname }}/{{ item | basename }}"
     fail_on_missing: false
     flat: true
   with_items:

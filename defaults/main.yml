@@ -8,7 +8,7 @@ docker_packages:
   - containerd.io
 docker_packages_state: present
 
-docker_certs_path: "/appdata/docker/certs"
+docker_certs_path: "{{ service_data }}/certs"
 fqdn: "yourdomain"
 docker_socket_port: 2376
 renew_certs: false
